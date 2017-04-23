@@ -12,8 +12,8 @@ argument during the training process at given intervals.
 There are two ways to create your own :class:`~chainer.training.Extension`
 object.
 
-1. Write a class inherited from :class:`~chainer.training.Extension`
-2. Decorate your function with :meth:`~chainer.training.make_extension`
+1. Decorate your function with :meth:`~chainer.training.make_extension`
+2. Write a class inherited from :class:`~chainer.training.Extension`
 
 Let's start to write an extension that performs learning rate dropping.
 
