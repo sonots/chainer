@@ -1,5 +1,4 @@
 import os
-import pkg_resources
 import tempfile
 import unittest
 
