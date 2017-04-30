@@ -23,8 +23,7 @@ Requirements for some features:
 - cuDNN support
   - cuDNN v2, v3, v4, v5, v5.1, v6
 - Caffe model support
-  - Protocol Buffers (pip install protobuf)
-    - protobuf>=3.0.0 is required for Py3
+  - Protocol Buffers 3 (pip install protobuf)
 - Image dataset support
   - Pillow
 - HDF5 serialization support
