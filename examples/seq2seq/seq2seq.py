@@ -226,8 +226,7 @@ def main():
     trainer = training.Trainer(updater, (args.epoch, 'epoch'))
     trainer.extend(extensions.LogReport(trigger=(200, 'iteration')))
     trainer.extend(extensions.PrintReport(
-        ['epoch', 'iteration', 'main/loss', 'validation/main/loss',
-         'main/perp', 'validation/main/perp', 'elapsed_time']),
+        ['epoch', 'iteration', 'main/loss', 'main/perp', 'elapsed_time']),
         trigger=(200, 'iteration'))
 
     def translate_one(source, target):
