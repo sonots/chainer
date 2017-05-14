@@ -16,9 +16,9 @@ class Deconvolution2D(link.Link):
     and holds the filter weight and bias vector as parameters.
 
     Args:
-        in_channels (int): Number of channels of input arrays. If ``None``,
-            parameter initialization will be deferred until the first forward
-            data pass at which time the size will be determined.
+        in_channels (int or None): Number of channels of input arrays.
+            If ``None``, parameter initialization will be deferred until the
+            first forward data pass at which time the size will be determined.
         out_channels (int): Number of channels of output arrays.
         ksize (int or pair of ints): Size of filters (a.k.a. kernels).
             ``ksize=k`` and ``ksize=(k, k)`` are equivalent.
@@ -109,7 +109,7 @@ class Deconvolution2D(link.Link):
 
     def __call__(self, x):
         if self.has_uninitialized_params:
-            with cuda.get_device(self._device_id):
+            with cuda.get_device_from_id(self._device_id):
                 self._initialize_params(x.shape[1])
         return deconvolution_2d.deconvolution_2d(
             x, self.W, self.b, self.stride, self.pad,
