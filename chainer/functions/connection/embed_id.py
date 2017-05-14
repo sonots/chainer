@@ -96,16 +96,55 @@ def embed_id(x, W, ignore_label=None):
     This function is only differentiable on the input ``W``.
 
     Args:
-        x (~chainer.Variable): Batch vectors of IDs.
-        W (~chainer.Variable): Representation of each ID (a.k.a.
-            word embeddings).
+        x (:class:`~chainer.Variable` or :class:`numpy.ndarray` or \
+        :class:`cupy.ndarray`):
+            Batch vectors of IDs.
+        W (:class:`~chainer.Variable` or :class:`numpy.ndarray` or \
+        :class:`cupy.ndarray`):
+            Representation of each ID (a.k.a. word embeddings).
         ignore_label (int or None): If ``ignore_label`` is an int value,
             ``i``-th column of return value is filled with ``0``.
 
     Returns:
-        ~chainer.Variable: Output variable.
+        ~chainer.Variable: Output variable 
 
     .. seealso:: :class:`~chainer.links.EmbedID`
+
+    .. admonition:: Example
+
+        **Example1** ``x`` is 1-dim case.
+
+        >>> W = np.array([[1, 1, 1], [2, 2, 2]]).astype('f')
+        >>> x = np.array([0, 1, 0]).astype('i')
+        >>> y = F.embed_id(x, W)
+        >>> y.data
+        array([[ 1.,  1.,  1.],
+               [ 2.,  2.,  2.],
+               [ 1.,  1.,  1.]], dtype=float32)
+        >>> x = np.array([0, 1, 2]).astype('i')
+        >>> y = F.embed_id(x, W)
+        Traceback (most recent call last):
+         ...
+        IndexError: index 2 is out of bounds for size 2
+        >>> y = F.embed_id(x, W, ignore_label=2)
+        >>> y.data
+        array([[ 1.,  1.,  1.],
+               [ 2.,  2.,  2.],
+               [ 0.,  0.,  0.]], dtype=float32)
+
+        **Example2** ``x`` is 2-dim case.
+
+        >>> W = np.array([[1, 1, 1], [2, 2, 2]]).astype('f')
+        >>> x = np.array([[0, 1, 0], [1, 0, 1]], dtype=np.int32)
+        >>> y = F.embed_id(x, W)
+        >>> y.data
+        array([[[ 1.,  1.,  1.],
+                [ 2.,  2.,  2.],
+                [ 1.,  1.,  1.]],
+        <BLANKLINE>
+               [[ 2.,  2.,  2.],
+                [ 1.,  1.,  1.],
+                [ 2.,  2.,  2.]]], dtype=float32)
 
     """
     return EmbedIDFunction(ignore_label=ignore_label)(x, W)
