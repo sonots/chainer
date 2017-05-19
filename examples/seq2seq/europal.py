@@ -1,8 +1,8 @@
 from __future__ import unicode_literals
 
-import codecs
 import collections
 import gzip
+import io
 import os
 import re
 
@@ -34,7 +34,7 @@ def open_file(path):
         if os.path.exists(gz):
             return open_file(gz)
         else:
-            return codecs.open(path, encoding='utf-8')
+            return io.open(path, encoding='utf-8', errors='ignore')
 
 
 def count_lines(path):
@@ -48,8 +48,6 @@ def read_file(path):
     with open_file(path) as f:
         for line in bar(f, max_value=n_lines):
             words = split_sentence(line)
-            if len(words) == 0:
-                continue
             yield words
 
 

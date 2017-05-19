@@ -7,6 +7,7 @@ import os.path
 from nltk.corpus import comtrans
 from nltk.translate import bleu_score
 import numpy
+import six
 
 import chainer
 from chainer import cuda
@@ -51,33 +52,34 @@ class Seq2seq(chainer.Chain):
         ys_in = [F.concat([eos, y], axis=0) for y in ys]
         ys_out = [F.concat([y, eos], axis=0) for y in ys]
 
+        # Both xs and ys_in are lists of arrays.
         exs = sequence_embed(self.embed_x, xs)
         eys = sequence_embed(self.embed_y, ys_in)
 
         batch = len(xs)
-        # Initial hidden variable and cell variable
-        zero = self.xp.zeros((self.n_layers, batch, self.n_units), 'f')
-        hx, cx, _ = self.encoder(zero, zero, exs)
+        # None represents a zero vector in an encoder.
+        hx, cx, _ = self.encoder(None, None, exs)
         _, _, os = self.decoder(hx, cx, eys)
+
+        # It is faster to concatenate data before calculating loss
+        # because only one matrix multiplication is called.
         concat_os = F.concat(os, axis=0)
         concat_ys_out = F.concat(ys_out, axis=0)
-        loss = F.softmax_cross_entropy(
-            self.W(concat_os), concat_ys_out, normalize=False) \
-            * concat_ys_out.shape[0] / batch
+        loss = F.sum(F.softmax_cross_entropy(
+            self.W(concat_os), concat_ys_out, reduce='no')) / batch
 
         reporter.report({'loss': loss.data}, self)
-        perp = self.xp.exp(loss.data / concat_ys_out.shape[0] * batch)
+        n_words = concat_ys_out.shape[0]
+        perp = self.xp.exp(loss.data * batch / n_words)
         reporter.report({'perp': perp}, self)
         return loss
 
-    def translate(self, xs, max_length=50):
+    def translate(self, xs, max_length=100):
         batch = len(xs)
         with chainer.no_backprop_mode():
             xs = [x[::-1] for x in xs]
             exs = sequence_embed(self.embed_x, xs)
-            # Initial hidden variable and cell variable
-            zero = self.xp.zeros((self.n_layers, batch, self.n_units), 'f')
-            h, c, _ = self.encoder(zero, zero, exs, train=False)
+            h, c, _ = self.encoder(None, None, exs, train=False)
             ys = self.xp.zeros(batch, 'i')
             result = []
             for i in range(max_length):
@@ -124,12 +126,16 @@ def convert(batch, device):
 class CalculateBleu(chainer.training.Extension):
 
     trigger = 1, 'epoch'
+    priority = chainer.training.PRIORITY_WRITER
 
-    def __init__(self, model, test_data, batch=100, device=-1):
+    def __init__(
+            self, model, test_data, key, batch=100, device=-1, max_length=100):
         self.model = model
         self.test_data = test_data
+        self.key = key
         self.batch = batch
         self.device = device
+        self.max_length = max_length
 
     def __call__(self, trainer):
         with chainer.no_backprop_mode():
@@ -141,13 +147,14 @@ class CalculateBleu(chainer.training.Extension):
 
                 sources = [
                     chainer.dataset.to_device(self.device, x) for x in sources]
-                ys = [y.tolist() for y in self.model.translate(sources)]
+                ys = [y.tolist()
+                      for y in self.model.translate(sources, self.max_length)]
                 hypotheses.extend(ys)
 
         bleu = bleu_score.corpus_bleu(
             references, hypotheses,
             smoothing_function=bleu_score.SmoothingFunction().method1)
-        print('BELU {}'.format(bleu))
+        reporter.report({self.key: bleu})
 
 
 def main():
@@ -191,16 +198,20 @@ def main():
         fr_path = os.path.join(args.input, 'giga-fren.release2.fixed.fr')
         target_vocab = ['<eos>', '<unk>'] + europal.count_words(fr_path)
         target_data = europal.make_dataset(fr_path, target_vocab)
+        assert len(source_data) == len(target_data)
         print('Original training data size: %d' % len(source_data))
-        train_data = [(s, t) for s, t in zip(source_data, target_data)
-                      if len(s) < 50 and len(t) < 50]
+        train_data = [(s, t)
+                      for s, t in six.moves.zip(source_data, target_data)
+                      if 0 < len(s) < 50 and 0 < len(t) < 50]
         print('Filtered training data size: %d' % len(train_data))
 
         en_path = os.path.join(args.input, 'dev', 'newstest2013.en')
         source_data = europal.make_dataset(en_path, source_vocab)
         fr_path = os.path.join(args.input, 'dev', 'newstest2013.fr')
         target_data = europal.make_dataset(fr_path, target_vocab)
-        test_data = list(zip(source_data, target_data))
+        assert len(source_data) == len(target_data)
+        test_data = [(s, t) for s, t in six.moves.zip(source_data, target_data)
+                     if 0 < len(s) and 0 < len(t)]
 
         source_ids = {word: index for index, word in enumerate(source_vocab)}
         target_ids = {word: index for index, word in enumerate(target_vocab)}
@@ -210,6 +221,7 @@ def main():
 
     model = seq2seq_attn.Seq2seqAttention(
         3, len(source_ids), len(target_ids), args.unit)
+
     if args.gpu >= 0:
         chainer.cuda.get_device(args.gpu).use()
         model.to_gpu(args.gpu)
@@ -225,7 +237,8 @@ def main():
                    trigger=(200, 'iteration'))
     trainer.extend(extensions.PrintReport(
         ['epoch', 'iteration', 'main/loss', 'validation/main/loss',
-         'main/perp', 'validation/main/perp', 'elapsed_time']),
+         'main/perp', 'validation/main/perp', 'validation/main/bleu',
+         'elapsed_time']),
         trigger=(200, 'iteration'))
 
     def translate_one(source, target):
@@ -254,9 +267,11 @@ def main():
         target = ' '.join([target_words[i] for i in target])
         translate_one(source, target)
 
-    trainer.extend(translate, trigger=(200, 'iteration'))
-    trainer.extend(CalculateBleu(model, test_data, device=args.gpu),
-                   trigger=(10000, 'iteration'))
+    trainer.extend(translate, trigger=(4000, 'iteration'))
+    trainer.extend(
+        CalculateBleu(
+            model, test_data, 'validation/main/bleu', device=args.gpu),
+        trigger=(4000, 'iteration'))
     print('start training')
     trainer.run()
 

@@ -24,7 +24,7 @@ install_requires = [
     'filelock',
     'nose',
     'numpy>=1.9.0',
-    'protobuf',
+    'protobuf>=2.6.0',
     'six>=1.9.0',
 ]
 
@@ -32,7 +32,7 @@ ext_modules = chainer_setup_build.get_ext_modules()
 
 setup(
     name='chainer',
-    version='1.23.0',
+    version='1.24.0',
     description='A flexible framework of neural networks',
     author='Seiya Tokui',
     author_email='tokui@preferred.jp',
@@ -74,6 +74,7 @@ setup(
               'chainer.training',
               'chainer.training.extensions',
               'chainer.training.triggers',
+              'chainer.training.updaters',
               'chainer.utils',
               'cupy',
               'cupy.binary',

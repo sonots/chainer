@@ -57,9 +57,9 @@ class StatelessLSTM(LSTMBase):
     hidden states.
 
     Args:
-        in_size (int): Dimension of input vectors. If ``None``, parameter
-            initialization will be deferred until the first forward data pass
-            at which time the size will be determined.
+        in_size (int or None): Dimension of input vectors. If ``None``,
+            parameter initialization will be deferred until the first forward
+            data pass at which time the size will be determined.
         out_size (int): Dimensionality of output vectors.
 
     Attributes:
@@ -84,7 +84,7 @@ class StatelessLSTM(LSTMBase):
         """
         if self.upward.has_uninitialized_params:
             in_size = x.size // x.shape[0]
-            with cuda.get_device(self._device_id):
+            with cuda.get_device_from_id(self._device_id):
                 self.upward._initialize_params(in_size)
                 self._initialize_params()
 
@@ -93,7 +93,7 @@ class StatelessLSTM(LSTMBase):
             lstm_in += self.lateral(h)
         if c is None:
             xp = self.xp
-            with cuda.get_device(self._device_id):
+            with cuda.get_device_from_id(self._device_id):
                 c = variable.Variable(
                     xp.zeros((x.shape[0], self.state_size), dtype=x.dtype),
                     volatile='auto')
@@ -219,7 +219,7 @@ class LSTM(LSTMBase):
 
         """
         if self.upward.has_uninitialized_params:
-            with cuda.get_device(self._device_id):
+            with cuda.get_device_from_id(self._device_id):
                 in_size = x.size // x.shape[0]
                 self.upward._initialize_params(in_size)
                 self._initialize_params()
@@ -243,7 +243,7 @@ class LSTM(LSTMBase):
                 lstm_in += self.lateral(self.h)
         if self.c is None:
             xp = self.xp
-            with cuda.get_device(self._device_id):
+            with cuda.get_device_from_id(self._device_id):
                 self.c = variable.Variable(
                     xp.zeros((batch, self.state_size), dtype=x.dtype),
                     volatile='auto')
