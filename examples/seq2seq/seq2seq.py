@@ -275,7 +275,7 @@ def main():
         CalculateBleu(
             model, test_data, 'validation/main/bleu', device=args.gpu),
         trigger=trigger)
-    trainer.extend(extensions.snapshot(trigger=trigger))
+    trainer.extend(extensions.snapshot(), trigger=trigger)
     print('start training')
     trainer.run()
 
