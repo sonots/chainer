@@ -167,8 +167,10 @@ def main():
                         help='GPU ID (negative value indicates CPU)')
     parser.add_argument('--resume', '-r', default='',
                         help='Resume the training from snapshot')
-    parser.add_argument('--unit', '-u', type=int, default=1024,
+    parser.add_argument('--unit', '-u', type=int, default=512,
                         help='Number of units')
+    parser.add_argument('--layer', '-l', type=int, default=2,
+                        help='Number of layers')
     parser.add_argument('--input', '-i', type=str, default='wmt',
                         help='Input directory')
     parser.add_argument('--out', '-o', default='result',
@@ -220,7 +222,7 @@ def main():
     source_words = {i: w for w, i in source_ids.items()}
 
     model = seq2seq_attn.Seq2seqAttention(
-        3, len(source_ids), len(target_ids), args.unit)
+        args.layer, len(source_ids), len(target_ids), args.unit)
 
     if args.gpu >= 0:
         chainer.cuda.get_device(args.gpu).use()
@@ -232,14 +234,13 @@ def main():
     train_iter = chainer.iterators.SerialIterator(train_data, args.batchsize)
     updater = training.StandardUpdater(
         train_iter, optimizer, converter=convert, device=args.gpu)
-    trainer = training.Trainer(updater, (args.epoch, 'epoch'))
-    trainer.extend(extensions.LogReport(trigger=(200, 'iteration')),
-                   trigger=(200, 'iteration'))
+    trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
+    trainer.extend(extensions.LogReport(trigger=(4000, 'iteration')))
     trainer.extend(extensions.PrintReport(
         ['epoch', 'iteration', 'main/loss', 'validation/main/loss',
          'main/perp', 'validation/main/perp', 'validation/main/bleu',
          'elapsed_time']),
-        trigger=(200, 'iteration'))
+        trigger=(4000, 'iteration'))
 
     def translate_one(source, target):
         words = europal.split_sentence(source)
@@ -251,7 +252,7 @@ def main():
         print('#  result : ' + ' '.join(words))
         print('#  expect : ' + target)
 
-    @chainer.training.make_extension(trigger=(200, 'iteration'))
+    @chainer.training.make_extension(trigger=(4000, 'iteration'))
     def translate(trainer):
         translate_one(
             'Who are we ?',
