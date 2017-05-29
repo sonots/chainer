@@ -230,12 +230,12 @@ def main():
     updater = training.StandardUpdater(
         train_iter, optimizer, converter=convert, device=args.gpu)
     trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
-    trainer.extend(extensions.LogReport(trigger=(200, 'iteration')))
+    trainer.extend(extensions.LogReport(trigger=(4000, 'iteration')))
     trainer.extend(extensions.PrintReport(
         ['epoch', 'iteration', 'main/loss', 'validation/main/loss',
          'main/perp', 'validation/main/perp', 'validation/main/bleu',
          'elapsed_time']),
-        trigger=(200, 'iteration'))
+        trigger=(4000, 'iteration'))
 
     def translate_one(source, target):
         words = europal.split_sentence(source)
@@ -247,7 +247,7 @@ def main():
         print('#  result : ' + ' '.join(words))
         print('#  expect : ' + target)
 
-    @chainer.training.make_extension(trigger=(200, 'iteration'))
+    @chainer.training.make_extension(trigger=(4000, 'iteration'))
     def translate(trainer):
         translate_one(
             'Who are we ?',
