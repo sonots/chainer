@@ -168,6 +168,8 @@ def main():
                         help='Resume the training from snapshot')
     parser.add_argument('--unit', '-u', type=int, default=1024,
                         help='Number of units')
+    parser.add_argument('--layer', '-l', type=int, default=3,
+                        help='Number of layers')
     parser.add_argument('--input', '-i', type=str, default='wmt',
                         help='Input directory')
     parser.add_argument('--out', '-o', default='result',
@@ -218,7 +220,7 @@ def main():
     target_words = {i: w for w, i in target_ids.items()}
     source_words = {i: w for w, i in source_ids.items()}
 
-    model = Seq2seq(3, len(source_ids), len(target_ids), args.unit)
+    model = Seq2seq(args.layer, len(source_ids), len(target_ids), args.unit)
     if args.gpu >= 0:
         chainer.cuda.get_device(args.gpu).use()
         model.to_gpu(args.gpu)
