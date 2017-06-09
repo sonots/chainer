@@ -163,6 +163,10 @@ def main():
                         help='Resume the training from snapshot')
     parser.add_argument('--unit', '-u', type=int, default=1024,
                         help='Number of units')
+    parser.add_argument('--layer', '-l', type=int, default=3,
+                        help='Number of layers')
+    parser.add_argument('--vocab-size', '-v', type=int, default=40000,
+                        help='Size of vocabulary')
     parser.add_argument('--input', '-i', type=str, default='wmt',
                         help='Input directory')
     parser.add_argument('--out', '-o', default='result',
@@ -187,10 +191,12 @@ def main():
     else:
         # Check file
         en_path = os.path.join(args.input, 'giga-fren.release2.fixed.en')
-        source_vocab = ['<eos>', '<unk>'] + europal.count_words(en_path)
+        source_vocab = ['<eos>', '<unk>'] + europal.count_words(
+            en_path, vocab_size=args.vocab_size)
         source_data = europal.make_dataset(en_path, source_vocab)
         fr_path = os.path.join(args.input, 'giga-fren.release2.fixed.fr')
-        target_vocab = ['<eos>', '<unk>'] + europal.count_words(fr_path)
+        target_vocab = ['<eos>', '<unk>'] + europal.count_words(
+            fr_path, vocab_size=args.vocab_size)
         target_data = europal.make_dataset(fr_path, target_vocab)
         assert len(source_data) == len(target_data)
         print('Original training data size: %d' % len(source_data))
@@ -213,7 +219,7 @@ def main():
     target_words = {i: w for w, i in target_ids.items()}
     source_words = {i: w for w, i in source_ids.items()}
 
-    model = Seq2seq(3, len(source_ids), len(target_ids), args.unit)
+    model = Seq2seq(args.layer, len(source_ids), len(target_ids), args.unit)
     if args.gpu >= 0:
         chainer.cuda.get_device(args.gpu).use()
         model.to_gpu(args.gpu)
@@ -221,17 +227,19 @@ def main():
     optimizer = chainer.optimizers.Adam()
     optimizer.setup(model)
 
+    short_term = (400, 'iteration')
+    long_term = (4000, 'iteration')
     train_iter = chainer.iterators.SerialIterator(train_data, args.batchsize)
     updater = training.StandardUpdater(
         train_iter, optimizer, converter=convert, device=args.gpu)
-    trainer = training.Trainer(updater, (args.epoch, 'epoch'))
-    trainer.extend(extensions.LogReport(trigger=(200, 'iteration')),
-                   trigger=(200, 'iteration'))
+    trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
+    trainer.extend(extensions.LogReport(trigger=short_term),
+                   trigger=short_term)
     trainer.extend(extensions.PrintReport(
         ['epoch', 'iteration', 'main/loss', 'validation/main/loss',
          'main/perp', 'validation/main/perp', 'validation/main/bleu',
          'elapsed_time']),
-        trigger=(200, 'iteration'))
+        trigger=short_term)
 
     def translate_one(source, target):
         words = europal.split_sentence(source)
@@ -243,7 +251,7 @@ def main():
         print('#  result : ' + ' '.join(words))
         print('#  expect : ' + target)
 
-    @chainer.training.make_extension(trigger=(200, 'iteration'))
+    @chainer.training.make_extension(short_term)
     def translate(trainer):
         translate_one(
             'Who are we ?',
@@ -259,11 +267,16 @@ def main():
         target = ' '.join([target_words[i] for i in target])
         translate_one(source, target)
 
-    trainer.extend(translate, trigger=(4000, 'iteration'))
+    trainer.extend(translate, trigger=short_term)
+
     trainer.extend(
         CalculateBleu(
             model, test_data, 'validation/main/bleu', device=args.gpu),
-        trigger=(4000, 'iteration'))
+        trigger=long_term)
+    trainer.extend(extensions.snapshot(), trigger=long_term)
+    if args.resume:
+        chainer.serializers.load_npz(args.resume, trainer)
+
     print('start training')
     trainer.run()
 
