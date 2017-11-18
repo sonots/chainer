@@ -27,16 +27,21 @@ import resnet50
 
 class PreprocessedDataset(chainer.dataset.DatasetMixin):
 
-    def __init__(self, path, root, mean, crop_size, random=True):
-        self.base = chainer.datasets.LabeledImageDataset(path, root)
+    def __init__(self, length, root, mean, crop_size, random=True):
+        # self.base = chainer.datasets.LabeledImageDataset(path, root)
+        self.length = int(length)
         self.mean = mean.astype('f')
         self.crop_size = crop_size
         self.random = random
 
     def __len__(self):
-        return len(self.base)
+        return self.length # len(self.base)
 
     def get_example(self, i):
+        image = np.random.rand(3, self.crop_size, self.crop_size).astype('f')
+        label = np.random.randint(0, 9, 1, 'int32')[0]
+        return image, label
+
         # It reads the i-th image/label pair and return a preprocessed image.
         # It applies following preprocesses:
         #     - Cropping (random or center rectangular)
@@ -117,7 +122,7 @@ def main():
         model.to_gpu()
 
     # Load the datasets and mean file
-    mean = np.load(args.mean)
+    mean = np.random.rand(3, model.insize, model.insize).astype('f') #  np.load(args.mean)
     train = PreprocessedDataset(args.train, args.root, mean, model.insize)
     val = PreprocessedDataset(args.val, args.root, mean, model.insize, False)
     # These iterators load the images with subprocesses running in parallel to
